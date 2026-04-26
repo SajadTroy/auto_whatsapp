@@ -1,4 +1,6 @@
+require('dotenv').config();
 const express = require('express');
+const crypto = require('crypto');
 const { client, getIsReady } = require('./whatsapp');
 const { addToQueue, formatPhoneNumber } = require('./queue');
 
@@ -7,6 +9,40 @@ const PORT = process.env.PORT || 3004;
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
+
+// API Key Hash Checking Middleware
+const apiKeyMiddleware = (req, res, next) => {
+    // Get the API key from 'x-api-key' header or 'api_key' query parameter
+    const providedKey = req.headers['x-api-key'] || req.query.api_key;
+    const expectedKey = process.env.API_SECRET_KEY;
+
+    if (!expectedKey) {
+        console.warn('API_SECRET_KEY is not set in environment variables!');
+        return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    if (!providedKey) {
+        return res.status(401).json({ error: 'API key is missing. Provide it via x-api-key header or api_key query parameter.' });
+    }
+
+    try {
+        // Securely compare hashes to avoid timing attacks
+        const providedHash = crypto.createHash('sha256').update(providedKey).digest();
+        const expectedHash = crypto.createHash('sha256').update(expectedKey).digest();
+
+        if (crypto.timingSafeEqual(providedHash, expectedHash)) {
+            next();
+        } else {
+            return res.status(403).json({ error: 'Invalid API key' });
+        }
+    } catch (err) {
+        console.error('Error during API key validation:', err);
+        return res.status(500).json({ error: 'Internal server error during authentication' });
+    }
+};
+
+// Apply the API key middleware to all /whatsapp routes
+app.use('/whatsapp', apiKeyMiddleware);
 
 // Endpoint to check if a number has an active WhatsApp account
 app.post('/whatsapp/check-number', async (req, res) => {
