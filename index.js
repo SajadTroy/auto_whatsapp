@@ -3,7 +3,7 @@ const { client, getIsReady } = require('./whatsapp');
 const { addToQueue, formatPhoneNumber } = require('./queue');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3004;
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
